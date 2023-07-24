@@ -35,6 +35,29 @@ HEMIS = ["Right", "Left"]
 RUNS   = ['LR','RL']
 N_RUNS = 2
 
+
+def get_normalization_stat():
+  dataMat = []
+  for i in range (len(subjects)):
+      for j in range(len(RUNS)):
+        ds = load_single_timeseries(subjects[i], task, j, remove_mean=False)
+        if(i==0):
+          dataMat=ds
+        else:
+          dataMat=np.hstack((dataMat,ds))
+
+  region_mean=np.mean(dataMat,axis=1)
+  region_std=np.std(dataMat,axis=1)
+  mat_shape=dataMat.shape
+
+  total_mat=np.reshape(dataMat,(1,mat_shape[0]*mat_shape[1]))
+  global_mean=np.mean(total_mat)
+  global_std=np.std(total_mat)
+
+  return region_mean,region_std,global_mean,global_std
+
+
+
 def load_single_timeseries(subject, experiment, run, remove_mean=True):
   """Load timeseries data for a single subject and single run.
 
@@ -85,12 +108,20 @@ def load_evs(subject, experiment, run):
 
   return frames_list
 
-
-def load_timeserise(task, subjectID, run, remove_mean):
+## loading timeseries per trial
+def load_timeserise(task, subjectID, run, normalization=False, normalStat=[], normalType='global'):
     right_Hemi_idx=np.arange(0,int(N_PARCELS/2),1)
     left_Hemi_idx=np.arange(int(N_PARCELS/2),N_PARCELS,1)
-    data = load_single_timeseries(subject=subjectID, experiment=task, run=run, remove_mean=remove_mean)
+    data = load_single_timeseries(subject=subjectID, experiment=task, run=run, remove_mean=False)
     evs = load_evs(subject=subjectID, experiment=task, run=run)
+
+    if(normalization):
+      if(normalType=='global'): 
+        data=(data-normalStat['mean'])/normalStat['std']
+      
+      else:
+        for i in range(N_PARCELS):
+          data[i,:]=(data[i,:]-normalStat['mean'][i])/normalStat['std'][i]
 
     ## separating retions within left and right hemisphere
     timeserise_right=data[right_Hemi_idx,:]
