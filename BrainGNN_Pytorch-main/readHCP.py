@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from nilearn import connectome
 
 HCP_DIR = "./hcp_task"
 rootpath='/content/gdrive/MyDrive/'
@@ -152,4 +153,49 @@ def load_timeserise(task, subjectID, run, normalization=False, normalStat=[], no
 
     return Total_Timeseries_Left, Total_Timeseries_Right
 
+
+def my_subject_connectivity(timeseries, kind):
+    """
+        timeseries   : timeseries table for subject (timepoints x regions)
+        subjects     : subject IDs
+        kind         : the kind of connectivity to be used, e.g. lasso, partial correlation, correlation
+        iter_no      : tangent connectivity iteration number for cross validation evaluation
+    returns:
+        connectivity : connectivity matrix (regions x regions)
+    """
+
+    if kind in ['TPE', 'TE', 'correlation','partial correlation']:
+        if kind not in ['TPE', 'TE']:
+            conn_measure = connectome.ConnectivityMeasure(kind=kind)
+            connectivity = conn_measure.fit_transform(timeseries)
+        else:
+            if kind == 'TPE':
+                conn_measure = connectome.ConnectivityMeasure(kind='correlation')
+                conn_mat = conn_measure.fit_transform(timeseries)
+                conn_measure = connectome.ConnectivityMeasure(kind='tangent')
+                connectivity_fit = conn_measure.fit(conn_mat)
+                connectivity = connectivity_fit.transform(conn_mat)
+            else:
+                conn_measure = connectome.ConnectivityMeasure(kind='tangent')
+                connectivity_fit = conn_measure.fit(timeseries)
+                connectivity = connectivity_fit.transform(timeseries)
+
+
+        if kind not in ['TPE', 'TE']:
+            return connectivity
+        else:
+            return connectivity_fit
+        
+def trials_connectivity(timeseries):
+  regNo,trlNo,smpl=timeseries.shape
+
+  network=[]
+  for t in range(trlNo):
+     trial_data=timeseries[:,t,:]
+     trial_data=trial_data.transpose()
+     corr = my_subject_connectivity(timeseries = [trial_data], kind = 'correlation')
+     network.append(corr[0])
+
+  return network
+  
 
