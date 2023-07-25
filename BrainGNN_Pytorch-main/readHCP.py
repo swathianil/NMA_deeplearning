@@ -221,7 +221,7 @@ def nma_process_data(subjects):
   region_mean,region_std,global_mean,global_std=get_normalization_stat()
   normalStat={'mean':region_mean, 'std':region_std}
 
-  for subj in range(subjects):
+  for subj in range(len(subjects)):
     for run in range(len(RUNS)):
       Total_Timeseries_Left, Total_Timeseries_Right, Cond_Label=load_timeserise(
             task='GAMBLING', subjectID=subjects[subj] ,run=run, normalization=True,
@@ -235,10 +235,14 @@ def nma_process_data(subjects):
         filename='subj_'+subjects[subj]+'_run_'+str(run)+'_trl_'+str(t)
         trial_data=combinedTimeseries[:,t,:]
         trial_data=trial_data.transpose()
-        corr, partialCorr=trials_connectivity(trial_data)
+
+        corr = my_subject_connectivity(timeseries = [trial_data], kind = 'correlation')
+        par_corr = my_subject_connectivity(timeseries = [trial_data], kind = 'partial correlation')
         
         dd.io.save(os.path.join(rootpath_networks,filename+'.h5'), 
-             {'corr':corr,'pcorr':partialCorr,'label':Cond_Label[t]%2})
+             {'corr':corr,'pcorr':par_corr,'label':Cond_Label[t]%2})
+        
+        print(f'subj{subj} run{run} trl {t}')
         
         
         
