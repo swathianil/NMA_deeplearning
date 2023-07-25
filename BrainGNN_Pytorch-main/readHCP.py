@@ -5,10 +5,16 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from nilearn import connectome
+import deepdish as dd
 
 HCP_DIR = "./hcp_task"
 rootpath='/content/gdrive/MyDrive/'
 inputData=rootpath+'hcp_task/subjects/'
+rootpath_networks = '/content/gdrive/MyDrive/networks/'
+
+if(os.path.exists(rootpath_networks)):
+   os.makedirs(rootpath_networks)
+
 task='GAMBLING'
 
 subjects=os.listdir(inputData)
@@ -117,9 +123,10 @@ def load_timeserise(task, subjectID, run, normalization=False, normalStat=[], no
     evs = load_evs(subject=subjectID, experiment=task, run=run)
 
     if(normalization):
-      if(normalType=='global'): 
+      len_mean=np.shape(normalStat['mean'])
+      if(normalType=='global'):
         data=(data-normalStat['mean'])/normalStat['std']
-      
+
       else:
         for i in range(N_PARCELS):
           data[i,:]=(data[i,:]-normalStat['mean'][i])/normalStat['std'][i]
@@ -131,27 +138,30 @@ def load_timeserise(task, subjectID, run, normalization=False, normalStat=[], no
     Total_Timeseries_Left=[]
     Total_Timeseries_Right=[]
     Cond_Label=[]
-    for cond in len(EXPERIMENTS[task]['cond']):
+
+    for cond in range(len(EXPERIMENTS[task]['cond'])):
       trialIndex=evs[cond]
       trlLen=len(trialIndex)
       sampleNo=np.shape(trialIndex[0])[0]
+      timeserise_right_trials=np.zeros((regionNum, trlLen, sampleNo))
+      timeserise_left_trials=np.zeros((regionNum, trlLen, sampleNo))
 
-      timeserise_right_trials=np.array((regionNum, trlLen, sampleNo))
-      timeserise_left_trials=np.array((regionNum, trlLen, sampleNo))
       for t in range(trlLen):
         point_index=trialIndex[t]
         timeserise_right_trials[:,t,:]=timeserise_right[:,point_index]
         timeserise_left_trials[:,t,:]=timeserise_left[:,point_index]
+        # Cond_Label.append(EXPERIMENTS[task]['cond'][cond])
+        Cond_Label.append(cond)
 
-      Cond_Label.append(EXPERIMENTS[task]['cond'])
       if(cond==0):
         Total_Timeseries_Left=timeserise_left_trials
         Total_Timeseries_Right=timeserise_right_trials
       else:
         Total_Timeseries_Left=np.hstack((Total_Timeseries_Left, timeserise_left_trials))
         Total_Timeseries_Right=np.hstack((Total_Timeseries_Right, timeserise_right_trials))
-
-    return Total_Timeseries_Left, Total_Timeseries_Right
+      
+      Label=np.array(Cond_Label)
+    return Total_Timeseries_Left, Total_Timeseries_Right, Label
 
 
 def my_subject_connectivity(timeseries, kind):
@@ -190,12 +200,48 @@ def trials_connectivity(timeseries):
   regNo,trlNo,smpl=timeseries.shape
 
   network=[]
+  partial_network=[]
   for t in range(trlNo):
      trial_data=timeseries[:,t,:]
      trial_data=trial_data.transpose()
      corr = my_subject_connectivity(timeseries = [trial_data], kind = 'correlation')
+     par_corr = my_subject_connectivity(timeseries = [trial_data], kind = 'partial correlation')
      network.append(corr[0])
+     partial_network.append(par_corr[0])
 
-  return network
+  return network,partial_network
+
+
+def saveNetworkData(network, partial_network, labels, filename):
+  dd.io.save(os.path.join(rootpath_networks,filename+'.h5'), 
+             {'corr':network,'pcorr':partial_network,'label':labels%2})
+  
+
+def nma_process_data(subjects):
+  region_mean,region_std,global_mean,global_std=get_normalization_stat()
+  normalStat={'mean':region_mean, 'std':region_std}
+
+  for subj in range(subjects):
+    for run in range(len(RUNS)):
+      Total_Timeseries_Left, Total_Timeseries_Right, Cond_Label=load_timeserise(
+            task='GAMBLING', subjectID=subjects[subj] ,run=run, normalization=True,
+            normalStat=normalStat, normalType='local')
+      
+      combinedTimeseries=np.vstack((Total_Timeseries_Right,Total_Timeseries_Left))
+      
+      regNo,trlNo,smpl=combinedTimeseries.shape
+
+      for t in range(trlNo):
+        filename='subj_'+subjects[subj]+'_run_'+str(run)+'_trl_'+str(t)
+        trial_data=combinedTimeseries[:,t,:]
+        trial_data=trial_data.transpose()
+        corr, partialCorr=trials_connectivity(trial_data)
+        saveNetworkData(corr, partialCorr, Cond_Label[t], filename)
+        
+        
+        
+         
+   
+   
   
 
