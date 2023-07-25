@@ -10,7 +10,7 @@ import deepdish as dd
 HCP_DIR = "./hcp_task"
 rootpath='/content/gdrive/MyDrive/'
 inputData=rootpath+'hcp_task/subjects/'
-rootpath_networks = '/content/gdrive/MyDrive/networks/'
+rootpath_networks=HCP_DIR+'networks/'
 
 if(os.path.exists(rootpath_networks)):
    os.makedirs(rootpath_networks)
@@ -212,7 +212,7 @@ def trials_connectivity(timeseries):
   return network,partial_network
 
 
-def saveNetworkData(network, partial_network, labels, filename):
+def saveNetworkData(network, partial_network, labels, rootpath_networks, filename):
   dd.io.save(os.path.join(rootpath_networks,filename+'.h5'), 
              {'corr':network,'pcorr':partial_network,'label':labels%2})
   
@@ -236,7 +236,9 @@ def nma_process_data(subjects):
         trial_data=combinedTimeseries[:,t,:]
         trial_data=trial_data.transpose()
         corr, partialCorr=trials_connectivity(trial_data)
-        saveNetworkData(corr, partialCorr, Cond_Label[t], filename)
+        
+        dd.io.save(os.path.join(rootpath_networks,filename+'.h5'), 
+             {'corr':corr,'pcorr':partialCorr,'label':Cond_Label[t]%2})
         
         
         
